@@ -2,13 +2,22 @@ import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
-const PanoramaViewer = () => {
+const MOUSE_SCALE = 0.2;
+const SMOOTH_INTERPOLATION_VALUE = 0.12;
+const INITIAL_ROTATE_SPEED = -0.5;
+
+const PanoramaViewer = ({
+  texturePath,
+  fov = 75,
+  fovMin = 20,
+  fovMax = 90,
+}) => {
   const mountRef = useRef(null);
 
   useEffect(() => {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
-      75,
+      fov,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
@@ -19,7 +28,7 @@ const PanoramaViewer = () => {
     mountRef.current.appendChild(renderer.domElement);
 
     const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load("/images/pano_1.jpg");
+    const texture = textureLoader.load(texturePath);
     texture.colorSpace = THREE.SRGBColorSpace;
 
     const geometry = new THREE.SphereGeometry(500, 60, 40);
@@ -39,7 +48,7 @@ const PanoramaViewer = () => {
     controls.enableZoom = false;
     controls.enablePan = false;
     controls.enableDamping = true;
-    controls.rotateSpeed = -0.5;
+    controls.rotateSpeed = INITIAL_ROTATE_SPEED;
     controls.update();
 
     function onWindowResize() {
@@ -51,19 +60,68 @@ const PanoramaViewer = () => {
 
     // Handle mouse wheel to zoom in/out
     let targetFOV = camera.fov;
+    let targetPosition = camera.position;
+
+    const reflectVectorAcrossPlaneWithNormal = (A, B) => {
+      const normalB = B.clone().normalize();
+      const dotProduct = A.dot(normalB);
+
+      // Calculate the reflection vector R = A - 2*(A·B)*B
+      // This reflects A in the plane orthogonal to B (using B as the plane's normal)
+      const reflectionVector = normalB
+        .multiplyScalar(2 * dotProduct)
+        .sub(A)
+        .negate();
+
+      return reflectionVector;
+    };
+
     const onWheel = (event) => {
+      event.preventDefault();
       const delta = event.deltaY;
-      targetFOV += delta * 0.05;
-      targetFOV = THREE.MathUtils.clamp(targetFOV, 20, 90); // Clamp between 20 and 90 degrees or your desired min/max zoom
+
+      targetFOV += delta;
+      targetFOV = THREE.MathUtils.clamp(targetFOV, fovMin, fovMax);
+
+      if (targetFOV <= fovMin || targetFOV >= fovMax) return;
+
+      // Determine mouse position
+      const rect = renderer.domElement.getBoundingClientRect();
+      let mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      let mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // Scale mouse position lower camera translation distance per zoom level
+      mouseX *= MOUSE_SCALE;
+      mouseY *= MOUSE_SCALE;
+
+      // Raycasting to find intersecting point on the sphere
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+      const intersects = raycaster.intersectObject(sphere);
+
+      if (intersects.length > 0) {
+        const endVector = intersects[0].point.normalize().multiplyScalar(0.1);
+
+        if (delta > 0) {
+          //   mirror the vector across the camera vector to get the new position
+          targetPosition = reflectVectorAcrossPlaneWithNormal(
+            endVector,
+            targetPosition
+          );
+        } else {
+          targetPosition = endVector.negate();
+        }
+      }
     };
     renderer.domElement.addEventListener("wheel", onWheel);
 
-    // Render Loop
     const animate = () => {
       requestAnimationFrame(animate);
       if (Math.abs(targetFOV - camera.fov) > 0.1) {
-        camera.fov += (targetFOV - camera.fov) * 0.1; // Smoothly interpolate FOV
+        camera.fov += (targetFOV - camera.fov) * SMOOTH_INTERPOLATION_VALUE; // Smoothly interpolate FOV
         controls.rotateSpeed = -0.5 + (75 - camera.fov) / 150; // might need to be adjusted
+
+        camera.position.lerp(targetPosition, SMOOTH_INTERPOLATION_VALUE);
         camera.updateProjectionMatrix();
       }
       controls.update();
@@ -77,7 +135,7 @@ const PanoramaViewer = () => {
       window.removeEventListener("resize", onWindowResize);
       mountRef.current.removeChild(renderer.domElement);
     };
-  }, []);
+  }, [texturePath, fov, fovMin, fovMax]);
 
   return <div ref={mountRef}></div>;
 };

@@ -4,7 +4,7 @@ import PanoramaViewer from "./PanoramaViewer";
 function App() {
   return (
     <div className="App">
-      <PanoramaViewer />
+      <PanoramaViewer texturePath="/images/pano_1.jpg" />
     </div>
   );
 }
