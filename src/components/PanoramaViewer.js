@@ -1,6 +1,8 @@
 import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import useAjaxTextureLoader from "../hooks/useAjaxTextureLoader";
+import "./PanoramaViewer.css";
 
 const MOUSE_SCALE = 0.2;
 const SMOOTH_INTERPOLATION_VALUE = 0.12;
@@ -8,11 +10,15 @@ const INITIAL_ROTATE_SPEED = -0.5;
 
 const PanoramaViewer = ({
   texturePath,
+  lowResTexturePath,
   fov = 75,
   fovMin = 20,
   fovMax = 90,
 }) => {
   const mountRef = useRef(null);
+  const sphereMaterialRef = useRef();
+  const { texture, loadingProgress, isLoading } =
+    useAjaxTextureLoader(texturePath);
 
   useEffect(() => {
     const scene = new THREE.Scene();
@@ -28,22 +34,22 @@ const PanoramaViewer = ({
     mountRef.current.appendChild(renderer.domElement);
 
     const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load(texturePath);
-    texture.colorSpace = THREE.SRGBColorSpace;
+    const lowResTexture = textureLoader.load(lowResTexturePath);
+    lowResTexture.colorSpace = THREE.SRGBColorSpace;
 
     const geometry = new THREE.SphereGeometry(500, 60, 40);
     geometry.scale(-1, 1, 1);
     const material = new THREE.MeshBasicMaterial({
-      map: texture,
+      map: lowResTexture,
       side: THREE.FrontSide,
     });
+    sphereMaterialRef.current = material;
     const sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
 
     camera.position.set(0, 0, 0.1);
     sphere.rotation.y = -Math.PI / 2; // Rotate the sphere for correct orientation
 
-    // Controls for pan and zoom
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableZoom = false;
     controls.enablePan = false;
@@ -135,9 +141,36 @@ const PanoramaViewer = ({
       window.removeEventListener("resize", onWindowResize);
       mountRef.current.removeChild(renderer.domElement);
     };
-  }, [texturePath, fov, fovMin, fovMax]);
+  }, [texturePath, lowResTexturePath, fov, fovMin, fovMax]);
 
-  return <div ref={mountRef}></div>;
+  useEffect(() => {
+    if (!isLoading && texture) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      if (sphereMaterialRef.current) {
+        sphereMaterialRef.current.map = texture;
+        sphereMaterialRef.current.needsUpdate = true;
+      }
+    }
+  }, [isLoading, texture]);
+
+  const LoadingProgressBar = ({ progress }) => (
+    <div className="loading-progress-bar-container">
+      <div
+        className="loading-progress-bar"
+        style={{
+          width: `${progress}%`,
+        }}
+      ></div>
+    </div>
+  );
+
+  return (
+    <div ref={mountRef} className="panorama-viewer-container">
+      {loadingProgress > 0 && loadingProgress < 100 && (
+        <LoadingProgressBar progress={loadingProgress} />
+      )}
+    </div>
+  );
 };
 
 export default PanoramaViewer;
