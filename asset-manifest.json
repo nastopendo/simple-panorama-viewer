@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/simple-panorama-viewer/static/css/main.29b42392.css",
+    "main.js": "/simple-panorama-viewer/static/js/main.ad6e49e7.js",
+    "index.html": "/simple-panorama-viewer/index.html",
+    "main.29b42392.css.map": "/simple-panorama-viewer/static/css/main.29b42392.css.map",
+    "main.ad6e49e7.js.map": "/simple-panorama-viewer/static/js/main.ad6e49e7.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.29b42392.css",
+    "static/js/main.ad6e49e7.js"
+  ]
+}
