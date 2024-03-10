@@ -63,6 +63,7 @@ const PanoramaViewer = () => {
       requestAnimationFrame(animate);
       if (Math.abs(targetFOV - camera.fov) > 0.1) {
         camera.fov += (targetFOV - camera.fov) * 0.1; // Smoothly interpolate FOV
+        controls.rotateSpeed = -0.5 + (75 - camera.fov) / 150; // might need to be adjusted
         camera.updateProjectionMatrix();
       }
       controls.update();
