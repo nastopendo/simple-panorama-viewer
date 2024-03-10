@@ -36,17 +36,35 @@ const PanoramaViewer = () => {
 
     // Controls for pan and zoom
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableZoom = true;
+    controls.enableZoom = false;
     controls.enablePan = false;
-    controls.minDistance = 1;
-    controls.maxDistance = 500;
     controls.enableDamping = true;
     controls.rotateSpeed = -0.5;
     controls.update();
 
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener("resize", onWindowResize, false);
+
+    // Handle mouse wheel to zoom in/out
+    let targetFOV = camera.fov;
+    const onWheel = (event) => {
+      const delta = event.deltaY;
+      targetFOV += delta * 0.05;
+      targetFOV = THREE.MathUtils.clamp(targetFOV, 20, 90); // Clamp between 20 and 90 degrees or your desired min/max zoom
+    };
+    renderer.domElement.addEventListener("wheel", onWheel);
+
     // Render Loop
     const animate = () => {
       requestAnimationFrame(animate);
+      if (Math.abs(targetFOV - camera.fov) > 0.1) {
+        camera.fov += (targetFOV - camera.fov) * 0.1; // Smoothly interpolate FOV
+        camera.updateProjectionMatrix();
+      }
       controls.update();
       renderer.render(scene, camera);
     };
@@ -54,6 +72,8 @@ const PanoramaViewer = () => {
 
     // Clean up on component unmount
     return () => {
+      renderer.domElement.removeEventListener("wheel", onWheel);
+      window.removeEventListener("resize", onWindowResize);
       mountRef.current.removeChild(renderer.domElement);
     };
   }, []);
