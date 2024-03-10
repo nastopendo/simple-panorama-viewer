@@ -101,6 +101,8 @@ const PanoramaViewer = ({
 
     window.addEventListener("resize", onWindowResize, false);
 
+    mountRef.current.userData = { camera, renderer, controls };
+
     // Handle mouse wheel to zoom in/out
     let targetFOV = camera.fov;
     let targetPosition = camera.position;
