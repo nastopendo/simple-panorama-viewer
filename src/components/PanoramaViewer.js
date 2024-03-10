@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import useAjaxTextureLoader from "../hooks/useAjaxTextureLoader";
@@ -7,6 +7,31 @@ import "./PanoramaViewer.css";
 const MOUSE_SCALE = 0.2;
 const SMOOTH_INTERPOLATION_VALUE = 0.12;
 const INITIAL_ROTATE_SPEED = -0.5;
+
+const reflectVectorAcrossPlaneWithNormal = (A, B) => {
+  const normalB = B.clone().normalize();
+  const dotProduct = A.dot(normalB);
+
+  // Calculate the reflection vector R = A - 2*(A·B)*B
+  // This reflects A in the plane orthogonal to B (using B as the plane's normal)
+  const reflectionVector = normalB
+    .multiplyScalar(2 * dotProduct)
+    .sub(A)
+    .negate();
+
+  return reflectionVector;
+};
+
+const LoadingProgressBar = ({ progress }) => (
+  <div className="loading-progress-bar-container">
+    <div
+      className="loading-progress-bar"
+      style={{
+        width: `${progress}%`,
+      }}
+    ></div>
+  </div>
+);
 
 const PanoramaViewer = ({
   texturePath,
@@ -19,6 +44,15 @@ const PanoramaViewer = ({
   const sphereMaterialRef = useRef();
   const { texture, loadingProgress, isLoading } =
     useAjaxTextureLoader(texturePath);
+
+  const onWindowResize = useCallback(() => {
+    const camera = mountRef.current.userData.camera;
+    const renderer = mountRef.current.userData.renderer;
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }, []);
 
   useEffect(() => {
     const scene = new THREE.Scene();
@@ -55,41 +89,21 @@ const PanoramaViewer = ({
     controls.enablePan = false;
     controls.enableDamping = true;
     controls.rotateSpeed = INITIAL_ROTATE_SPEED;
-
     renderer.domElement.style.cursor = "grab";
-    controls.addEventListener("start", function () {
-      renderer.domElement.style.cursor = "grabbing";
-    });
-    controls.addEventListener("end", function () {
-      renderer.domElement.style.cursor = "grab";
-    });
+
+    const handleStart = () => (renderer.domElement.style.cursor = "grabbing");
+    const handleEnd = () => (renderer.domElement.style.cursor = "grab");
+
+    controls.addEventListener("start", handleStart);
+    controls.addEventListener("end", handleEnd);
 
     controls.update();
 
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
     window.addEventListener("resize", onWindowResize, false);
 
     // Handle mouse wheel to zoom in/out
     let targetFOV = camera.fov;
     let targetPosition = camera.position;
-
-    const reflectVectorAcrossPlaneWithNormal = (A, B) => {
-      const normalB = B.clone().normalize();
-      const dotProduct = A.dot(normalB);
-
-      // Calculate the reflection vector R = A - 2*(A·B)*B
-      // This reflects A in the plane orthogonal to B (using B as the plane's normal)
-      const reflectionVector = normalB
-        .multiplyScalar(2 * dotProduct)
-        .sub(A)
-        .negate();
-
-      return reflectionVector;
-    };
 
     const onWheel = (event) => {
       event.preventDefault();
@@ -146,18 +160,13 @@ const PanoramaViewer = ({
 
     // Clean up on component unmount
     return () => {
-      controls.removeEventListener("start", function () {
-        renderer.domElement.style.cursor = "grabbing";
-      });
-      controls.removeEventListener("end", function () {
-        renderer.domElement.style.cursor = "grab";
-      });
-
+      controls.removeEventListener("start", handleStart);
+      controls.removeEventListener("end", handleEnd);
       renderer.domElement.removeEventListener("wheel", onWheel);
       window.removeEventListener("resize", onWindowResize);
       mountRef.current.removeChild(renderer.domElement);
     };
-  }, [texturePath, lowResTexturePath, fov, fovMin, fovMax]);
+  }, [texturePath, lowResTexturePath, fov, fovMin, fovMax, onWindowResize]);
 
   useEffect(() => {
     if (!isLoading && texture) {
@@ -168,17 +177,6 @@ const PanoramaViewer = ({
       }
     }
   }, [isLoading, texture]);
-
-  const LoadingProgressBar = ({ progress }) => (
-    <div className="loading-progress-bar-container">
-      <div
-        className="loading-progress-bar"
-        style={{
-          width: `${progress}%`,
-        }}
-      ></div>
-    </div>
-  );
 
   return (
     <div ref={mountRef} className="panorama-viewer-container">
