@@ -55,6 +55,15 @@ const PanoramaViewer = ({
     controls.enablePan = false;
     controls.enableDamping = true;
     controls.rotateSpeed = INITIAL_ROTATE_SPEED;
+
+    renderer.domElement.style.cursor = "grab";
+    controls.addEventListener("start", function () {
+      renderer.domElement.style.cursor = "grabbing";
+    });
+    controls.addEventListener("end", function () {
+      renderer.domElement.style.cursor = "grab";
+    });
+
     controls.update();
 
     function onWindowResize() {
@@ -137,6 +146,13 @@ const PanoramaViewer = ({
 
     // Clean up on component unmount
     return () => {
+      controls.removeEventListener("start", function () {
+        renderer.domElement.style.cursor = "grabbing";
+      });
+      controls.removeEventListener("end", function () {
+        renderer.domElement.style.cursor = "grab";
+      });
+
       renderer.domElement.removeEventListener("wheel", onWheel);
       window.removeEventListener("resize", onWindowResize);
       mountRef.current.removeChild(renderer.domElement);
